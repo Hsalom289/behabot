@@ -1,41 +1,55 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
-# Yangi token
 TOKEN = '7596912191:AAGTup9GbxIe0m8Ex6pJqKZhfnvRK2L1WAY'
 MUHAMMAD_ISKANDAROV_ID = 7807493773
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
+class Form(StatesGroup):
+    waiting_for_question = State()
+    waiting_for_reply = State()
+
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    user = message.from_user
     
     if user.id == MUHAMMAD_ISKANDAROV_ID:
-        await update.message.reply_text("Salom, nma gap boshliq?")
+        await message.answer("Salom, nma gap boshliq?")
         return
     
-    # "Adminga Savol berish" inline knopka sifatida matn tagida
-    keyboard = [[InlineKeyboardButton("Adminga Savol berish", callback_data='ask_question')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    inline_keyboard = InlineKeyboardBuilder()
+    inline_keyboard.add(InlineKeyboardButton(
+        text="Adminga Savol berish", 
+        callback_data="ask_question"
+    ))
     
-    # "Narxlar" va "Isbot uchun" knopkalari pastdan chiqadi
-    keyboard_bottom = [["Narxlar", "Isbot uchun"]]
-    reply_markup_bottom = ReplyKeyboardMarkup(keyboard_bottom, resize_keyboard=True, one_time_keyboard=False)
+    reply_keyboard = ReplyKeyboardBuilder()
+    reply_keyboard.add(
+        types.KeyboardButton(text="Narxlar"),
+        types.KeyboardButton(text="Isbot uchun")
+    )
+    reply_keyboard.adjust(2)
     
-    # Xabar va inline knopka birgalikda, pastdagi knopkalar esa alohida qo‘shiladi
-    await update.message.reply_text(
+    await message.answer(
         f"Salom, {user.first_name}! 😊\n"
         "Adminga savol berish uchun quyidagi knopkani bosing:",
-        reply_markup=reply_markup  # Inline knopka
+        reply_markup=inline_keyboard.as_markup()
     )
     
-    # Pastdagi knopkalarni qo‘shish uchun xabarni reply_markup_bottom bilan yuboramiz
-    await update.message.reply_text(
+    await message.answer(
         "Quyidagi knopkalardan birini tanlang:",
-        reply_markup=reply_markup_bottom  # Pastdagi doimiy knopkalar
+        reply_markup=reply_keyboard.as_markup(resize_keyboard=True)
     )
 
-# "Narxlar" knopkasi bosilganda
-async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+@dp.message(F.text == "Narxlar")
+async def show_prices(message: types.Message):
+    await message.answer(
         "Narxlar❕\n\n"
         "1000 ta 50 ming (aralash)👥\n"
         "1000 ta 55 ming (faqat ayollar)👩\n\n"
@@ -45,9 +59,9 @@ async def show_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ADMIN 👤@Muhammad_iskandarov"
     )
 
-# "Isbot uchun" knopkasi bosilganda
-async def show_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+@dp.message(F.text == "Isbot uchun")
+async def show_proof(message: types.Message):
+    await message.answer(
         "ISBOT GURUHI! 🤖\n"
         "@Odamqushishhizmatil\n"
         "@Odam_QUSHlSH\n\n"
@@ -58,118 +72,93 @@ async def show_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "BUNDAN BOSHQA AKKAUNT VA NOMERIM YUQ ALDANIB QOLMANG‼️"
     )
 
-# "Adminga Savol berish" knopkasi bosilganda
-async def ask_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.message.reply_text("Savolingizni yozing:")
-    context.user_data['waiting_for_question'] = True
-    print("Knopka bosildi va 'Savolingizni yozing' xabari yuborildi")
+@dp.callback_query(F.data == "ask_question")
+async def ask_question(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Savolingizni yozing:")
+    await state.set_state(Form.waiting_for_question)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    message_text = update.message.text
-    
-    # Admin xabarlari uchun alohida funksiyaga o‘tadi
-    if user.id == MUHAMMAD_ISKANDAROV_ID:
-        await handle_admin_reply(update, context)
+@dp.message(Form.waiting_for_question)
+async def handle_question(message: types.Message, state: FSMContext):
+    user_message = message.text
+    if len(user_message.strip()) < 5:
+        await message.answer("Savolingizni to'liq va aniq yozing!")
         return
     
-    # "Narxlar" knopkasi bosilganda
-    if message_text == "Narxlar":
-        await show_prices(update, context)
-        return
-    
-    # "Isbot uchun" knopkasi bosilganda
-    if message_text == "Isbot uchun":
-        await show_proof(update, context)
-        return
-    
-    # Agar foydalanuvchi savol yozayotgan bo‘lsa
-    if context.user_data.get('waiting_for_question', False):
-        user_message = update.message.text
-        if len(user_message.strip()) < 5:
-            await update.message.reply_text("Savolingizni to‘liq va aniq yozing!")
-            return
-        
-        try:
-            keyboard = [[InlineKeyboardButton("Foydalanuvchiga javob yozish", callback_data=f'reply_to_{user.id}')]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            # Username bo‘lsa ko‘rsatamiz, bo‘lmasa lichkaga havola qo‘shamiz
-            if user.username:
-                username_display = f"@{user.username}"
-            else:
-                user_link = f'<a href="tg://user?id={user.id}">Foydalanuvchi lichkasi</a>'
-                username_display = user_link
-            # Hamma narsani bitta xabarda yuboramiz, HTML formatida
-            await context.bot.send_message(
-                chat_id=MUHAMMAD_ISKANDAROV_ID,
-                text=f"Yangi savol!\n\nFoydalanuvchi: {user.first_name} (ID: {user.id})\nUsername: {username_display}\n\nXabar:\n{user_message}",
-                reply_markup=reply_markup,
-                parse_mode="HTML"  # Havolani bosiladigan qilish uchun HTML ishlatamiz
-            )
-            await update.message.reply_text("Savolingiz adminga yuborildi, javobni kuting!")
-            context.user_data['waiting_for_question'] = False
-        except Exception as e:
-            await update.message.reply_text(f"Xatolik: {str(e)}")
-            print(f"Foydalanuvchi savolini adminga yuborishda xatolik: {str(e)}")
-    else:
-        await update.message.reply_text("Iltimos, adminga savol berish uchun matndagi 'Adminga Savol berish' knopkasini bosing yoki pastdagi knopkalardan birini tanlang!")
-
-async def handle_reply_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    
-    if query.from_user.id != MUHAMMAD_ISKANDAROV_ID:
-        await query.answer(f"Bu funksiya faqat admin uchun! Sizning ID'ingiz: {query.from_user.id}")
-        return
-    
-    user_id = int(query.data.split('_')[-1])
-    context.user_data['reply_to_user_id'] = user_id
-    
-    await query.answer()
-    await query.message.reply_text(f"Foydalanuvchi (ID: {user_id}) ga yuboriladigan javobingizni yozing:")
-    print(f"Admin javob yozish uchun tayyorlandi. Foydalanuvchi ID: {user_id}")
-
-async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != MUHAMMAD_ISKANDAROV_ID:
-        return
-    
-    if 'reply_to_user_id' not in context.user_data:
-        await update.message.reply_text("Javob yuborish uchun foydalanuvchi tanlanmagan.")
-        return
-    
-    reply_message = update.message.text
-    user_chat_id = context.user_data['reply_to_user_id']
-    
-    print(f"Admin javobi yuborilmoqda. Foydalanuvchi ID: {user_chat_id}, Xabar: {reply_message}")
+    user = message.from_user
     
     try:
-        # Foydalanuvchiga javob yuborish
-        await context.bot.send_message(
+        keyboard = InlineKeyboardBuilder()
+        keyboard.add(InlineKeyboardButton(
+            text="Foydalanuvchiga javob yozish", 
+            callback_data=f"reply_to_{user.id}"
+        ))
+        
+        if user.username:
+            username_display = f"@{user.username}"
+        else:
+            user_link = f'<a href="tg://user?id={user.id}">Foydalanuvchi lichkasi</a>'
+            username_display = user_link
+        
+        await bot.send_message(
+            chat_id=MUHAMMAD_ISKANDAROV_ID,
+            text=f"Yangi savol!\n\nFoydalanuvchi: {user.first_name} (ID: {user.id})\nUsername: {username_display}\n\nXabar:\n{user_message}",
+            reply_markup=keyboard.as_markup(),
+            parse_mode="HTML"
+        )
+        await message.answer("Savolingiz adminga yuborildi, javobni kuting!")
+        await state.clear()
+    except Exception as e:
+        await message.answer(f"Xatolik: {str(e)}")
+
+@dp.callback_query(F.data.startswith("reply_to_"))
+async def handle_reply_button(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id != MUHAMMAD_ISKANDAROV_ID:
+        await callback.answer(f"Bu funksiya faqat admin uchun! Sizning ID'ingiz: {callback.from_user.id}")
+        return
+    
+    user_id = int(callback.data.split('_')[-1])
+    await state.update_data(reply_to_user_id=user_id)
+    
+    await callback.answer()
+    await callback.message.answer(f"Foydalanuvchi (ID: {user_id}) ga yuboriladigan javobingizni yozing:")
+    await state.set_state(Form.waiting_for_reply)
+
+@dp.message(Form.waiting_for_reply)
+async def handle_admin_reply(message: types.Message, state: FSMContext):
+    if message.from_user.id != MUHAMMAD_ISKANDAROV_ID:
+        return
+    
+    data = await state.get_data()
+    if 'reply_to_user_id' not in data:
+        await message.answer("Javob yuborish uchun foydalanuvchi tanlanmagan.")
+        return
+    
+    reply_message = message.text
+    user_chat_id = data['reply_to_user_id']
+    
+    try:
+        await bot.send_message(
             chat_id=user_chat_id,
             text=f"Admin javobi:\n\n{reply_message}"
         )
-        # Adminga tasdiq xabari
-        await context.bot.send_message(
+        await bot.send_message(
             chat_id=MUHAMMAD_ISKANDAROV_ID,
             text=f"Javob foydalanuvchiga (ID: {user_chat_id}) yuborildi!"
         )
-        print(f"Javob muvaffaqiyatli yuborildi. Foydalanuvchi ID: {user_chat_id}")
     except Exception as e:
-        await update.message.reply_text(f"Xatolik: {str(e)}")
-        print(f"Javob yuborishda xatolik: {str(e)}")
+        await message.answer(f"Xatolik: {str(e)}")
         return
     
-    del context.user_data['reply_to_user_id']
+    await state.clear()
 
-def main():
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(ask_question, pattern='ask_question'))
-    app.add_handler(CallbackQueryHandler(handle_reply_button, pattern=r'reply_to_\d+'))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("Bot ishga tushdi...")
-    app.run_polling()
+@dp.message()
+async def handle_other_messages(message: types.Message):
+    await message.answer("Iltimos, adminga savol berish uchun matndagi 'Adminga Savol berish' knopkasini bosing yoki pastdagi knopkalardan birini tanlang!")
+
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
