@@ -1,9 +1,11 @@
+import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.enums import ParseMode
 
 TOKEN = '7596912191:AAGTup9GbxIe0m8Ex6pJqKZhfnvRK2L1WAY'
 MUHAMMAD_ISKANDAROV_ID = 7807493773
@@ -31,8 +33,8 @@ async def start(message: types.Message):
     
     reply_keyboard = ReplyKeyboardBuilder()
     reply_keyboard.add(
-        types.KeyboardButton(text="Narxlar"),
-        types.KeyboardButton(text="Isbot uchun")
+        KeyboardButton(text="Narxlar"),
+        KeyboardButton(text="Isbot uchun")
     )
     reply_keyboard.adjust(2)
     
@@ -69,7 +71,8 @@ async def show_proof(message: types.Message):
         "@Muhammad_iskandarov\n\n"
         "TELEFON RAQAMIM\n"
         "+998 93 311 15 29 📱\n\n"
-        "BUNDAN BOSHQA AKKAUNT VA NOMERIM YUQ ALDANIB QOLMANG‼️"
+        "BUNDAN BOSHQA AKKAUNT VA NOMERIM YUQ ALDANIB QOLMANG‼️",
+        parse_mode=ParseMode.HTML
     )
 
 @dp.callback_query(F.data == "ask_question")
@@ -97,14 +100,13 @@ async def handle_question(message: types.Message, state: FSMContext):
         if user.username:
             username_display = f"@{user.username}"
         else:
-            user_link = f'<a href="tg://user?id={user.id}">Foydalanuvchi lichkasi</a>'
-            username_display = user_link
+            username_display = f'<a href="tg://user?id={user.id}">Foydalanuvchi lichkasi</a>'
         
         await bot.send_message(
             chat_id=MUHAMMAD_ISKANDAROV_ID,
             text=f"Yangi savol!\n\nFoydalanuvchi: {user.first_name} (ID: {user.id})\nUsername: {username_display}\n\nXabar:\n{user_message}",
             reply_markup=keyboard.as_markup(),
-            parse_mode="HTML"
+            parse_mode=ParseMode.HTML
         )
         await message.answer("Savolingiz adminga yuborildi, javobni kuting!")
         await state.clear()
